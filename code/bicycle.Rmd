@@ -1,0 +1,208 @@
+---
+title: "Untitled"
+author: "Weichen Li"
+date: "2020/5/5"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+install.packages("readxl")
+install.packages("GGally")
+library(readxl)
+library(tidyverse)
+library(glmnet)
+library(MASS)
+library(ggplot2)
+library(GGally)
+bicycle=read_excel("Bicycle.xlsx")
+
+bicycle<-bicycle[,-10]
+colnames(bicycle)[2]=c("High.Temp")
+colnames(bicycle)[3]=c("Low.Temp")
+pairs(Total~High.Temp+Low.Temp+Precipitation,data=bicycle)
+boxcox(Total~Precipitation,data=bicycle)
+boxcox(Total~High.Temp,data=bicycle)
+boxcox(Total~Low.Temp,data=bicycle)
+a=bicycle%>%mutate(Day=as.factor(Day))
+a=a[,-5:8]
+ggcorr(a)
+
+
+boxplot(Total ~ Day, data=bicycle)
+# Test NH: mu1 = mu2 = mu3 = mu4 = mu5 = mu6 = mu7
+m1 <- lm(Total ~ 0 + Day, data=bicycle) 
+
+summary(m1) # Full model, five separate means
+
+m0 <- lm(Total ~ 1 , data=bicycle)  
+
+summary(m0) # Reduced model, single mean
+
+anova(m0, m1)
+
+# P-value is about .03, so there is some evidence of a difference 
+#  but it is not very strong evidence
+
+TukeyHSD(aov(Total ~ Day, data=bicycle))
+
+# Test NH: mu1 = mu2 = mu3 = mu4 = mu5   mu6=mu7
+bicycle$Weekend<-NA
+for (i in 1:214) {
+  if(bicycle[i,1]=="Sunday" | bicycle[i,1]=="Saturday")bicycle[i,10]="Weekend"
+  else(bicycle[i,10]="Weekday")
+}
+m3<-lm(Total ~ 0 + Weekend, data=bicycle)
+summary(m3)
+anova(m3,m1)
+# Test NH: mu1 = mu2 = mu3 = mu4 = mu5   mu6 mu7
+
+bicycle$Sunday<-NA
+for (i in 1:214) {
+  if(bicycle[i,1]=="Sunday" )bicycle[i,11]=1
+  else(bicycle[i,11]=0)
+}
+bicycle$Saturday<-NA
+for (i in 1:214) {
+  if(bicycle[i,1]=="Saturday" )bicycle[i,10]=1
+  else(bicycle[i,10]=0)
+}
+m4<-lm(Total ~ Sunday + Saturday, data=bicycle)
+summary(m4)
+anova(m4,m1)
+anova(m3,m4)
+
+bicycle=bicycle%>%filter()
+m.full=lm(Total~High.Temp+Low.Temp+Precipitation+Sunday + Saturday,data=bicycle)
+m.1 <- step(m.full, direction="backward")
+summary(m.1)
+
+bicycle$weekfactor<- c(rep(c(rep('weekday',5),'saturday','sunday'),30),rep('weekday',4))
+TukeyHSD(aov(Total~weekfactor,data=bicycle))
+colnames(bicycle)[5:8]=c("Brooklyn.Bridge","Manhattan.Bridge","Williamsburg.Bridge","Queensboro.Bridge")
+m.full.B=lm(Brooklyn.Bridge~High.Temp+Low.Temp+Precipitation+Sunday + Saturday,data=bicycle)
+m.1.B <- step(m.full.B, direction="backward")
+summary(m.1.B)
+m.full.M=lm(Manhattan.Bridge~High.Temp+Low.Temp+Precipitation+Sunday + Saturday,data=bicycle)
+m.1.M <- step(m.full.M, direction="backward")
+summary(m.1.M)
+m.full.W=lm(Williamsburg.Bridge~High.Temp+Low.Temp+Precipitation+Sunday + Saturday,data=bicycle)
+m.1.W <- step(m.full.W, direction="backward")
+summary(m.1.W)
+m.full.Q=lm(Queensboro.Bridge~High.Temp+Low.Temp+Precipitation+Sunday + Saturday,data=bicycle)
+m.1.Q <- step(m.full.Q, direction="backward")
+summary(m.1.Q)
+
+new.data<-data.frame(High.Temp+Low.Temp+Precipitation+Sunday + Saturday)
+predict(m.1, newdata=new.cars)
+```
+
+```{r}
+
+
+library("Sleuth3");  rm(list=ls());  
+
+case0601
+
+# "Discrimination against the handicapped" data, describe on page 150
+
+dim(case0601); names(case0601);
+
+table(case0601$Handicap)
+
+foo <- levels(case0601$Handicap)
+
+case0601$Handicap <- factor(case0601$Handicap,levels=foo[c(5,2,3,1,4)])
+
+rm(foo); table(case0601$Handicap);  
+
+boxplot(Score ~ Handicap, data=case0601)
+
+# Not a great deal of difference between the ratings, seems that 
+#  rater-to-rater variability within a particular Handicap is much 
+#  greater than the variability between the different Handicaps
+
+
+
+# Test NH: mu1 = mu2 = mu3 = mu4 = mu5
+
+m1 <- lm(Score ~ 0 + Handicap, data=case0601) 
+
+summary(m1) # Full model, five separate means
+
+m0 <- lm(Score ~ 1 , data=case0601)  
+
+summary(m0) # Reduced model, single mean
+
+anova(m0, m1)
+
+# P-value is about .03, so there is some evidence of a difference 
+#  but it is not very strong evidence
+
+
+
+# The highest mean response is for crutches, and the lowest is for 
+#  hearing impared, do a 95% CI for that difference.  
+
+n <- with(case0601, tapply(Score, Handicap, length));   n;  
+
+ybar <- with(case0601, tapply(Score, Handicap, mean)); ybar;
+
+df <- m1$df.residual; df;  s.p <- summary(m1)$sigma;  s.p;
+
+t.mult <- qt(.975, df); t.mult;
+
+ybar[2] - ybar[3] + c(-1,1) * t.mult * s.p * sqrt(1/n[2] + 1/n[3])
+
+# And this confidence interval is not valid.
+
+# The true confidence level is not 95%, it's lower -- why?
+
+# Note that we chose these two groups to compare precisely because 
+#  they had the lowest and highest means.  So while we only reported 
+#  one confidence interval, we implicity conducted 5 choose 2 = 10 
+#  different pairwise comparisons.
+
+
+# Could do Bonferroni adjustment, nominal 99.5% CI
+
+t.mult <- qt(.9975, df); t.mult;
+
+ybar[2] - ybar[3] + c(-1,1) * t.mult * s.p * sqrt(1/n[2] + 1/n[3])
+
+# But this approach is overly conservative.
+
+
+# Do Tukey's HSD method to get simultaneous 95% confidence 
+#  intervals for all pairwise diffs
+
+TukeyHSD(aov(Score ~ Handicap, data=case0601))
+
+# The interval is wider than the original, as expected, but narrower 
+#  than the Bonferroni-adjusted CI, with is overly conservative.  
+#  Note it is the only one of the Tukey CIs that does not straddle 0.  
+#  We still have legitimate statistical support for the claim that 
+#  mean rating is higher for crutches than for hearing impared, but 
+#  the true precision of the estimated difference must be based on 
+#  the Tukey method, not the individual 95% CI.
+
+
+
+
+```
+
+```{r}
+m.B=lm(Brooklyn.Bridge~High.Temp+Precipitation+Sunday + Saturday,data=bicycle)
+summary(m.B)$coef
+m.M=lm(Manhattan.Bridge~High.Temp+Precipitation+Sunday + Saturday,data=bicycle)
+summary(m.M)
+m.W=lm(Williamsburg.Bridge~High.Temp+Precipitation+Sunday + Saturday,data=bicycle)
+summary(m.W)
+m.Q=lm(Queensboro.Bridge~High.Temp+Precipitation+Sunday + Saturday,data=bicycle)
+summary(m.Q)
+```
+
